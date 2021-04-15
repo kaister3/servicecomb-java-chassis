@@ -123,10 +123,11 @@ public class RouterDistributorTest {
         result = rule;
       }
     };
-    RouterRuleCache.refresh();
-    return RouterFilter
+    RouterRuleCache.refreshCache();
+    /*return RouterFilter
         .getFilteredListOfServers(serverlist, TARGET_SERVICE_NAME, headermap,
-            testDistributer);
+            testDistributer);*/
+    return null;
   }
 
   static class ServiceIns extends Server {

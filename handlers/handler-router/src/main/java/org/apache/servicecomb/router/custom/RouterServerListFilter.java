@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.servicecomb.router.custom;
 
 import java.util.HashMap;
@@ -25,11 +26,15 @@ import org.apache.servicecomb.foundation.common.utils.JsonUtils;
 import org.apache.servicecomb.foundation.common.utils.SPIServiceUtils;
 import org.apache.servicecomb.loadbalance.ServerListFilterExt;
 import org.apache.servicecomb.loadbalance.ServiceCombServer;
-import org.apache.servicecomb.router.RouterFilter;
+import org.apache.servicecomb.router.cache.RouterRuleCache;
 import org.apache.servicecomb.router.distribute.RouterDistributor;
 import org.apache.servicecomb.registry.api.registry.Microservice;
+import org.apache.servicecomb.router.match.RouterRuleMatcher;
+import org.apache.servicecomb.router.model.PolicyRuleItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -39,32 +44,68 @@ public class RouterServerListFilter implements ServerListFilterExt {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RouterServerListFilter.class);
 
-  private static final String ENABLE = "servicecomb.router.type";
+  private static final String FLAG = "servicecomb.router.type";
 
   private static final String TYPE_ROUTER = "router";
 
   private static final String ROUTER_HEADER = "X-RouterContext";
 
-  RouterDistributor<ServiceCombServer, Microservice> distributer = new ServiceCombCanaryDistributer();
+  RouterDistributor<ServiceCombServer, Microservice> distributor = new ServiceCombCanaryDistributer();
 
+  /**
+   * @return if the gray scale is opened
+   */
   @Override
   public boolean enabled() {
-    return DynamicPropertyFactory.getInstance().getStringProperty(ENABLE, "").get()
+    return DynamicPropertyFactory.getInstance().getStringProperty(FLAG, "").get()
         .equals(TYPE_ROUTER);
   }
 
+  /**
+   * @param list server list
+   * @param invocation invocation
+   * @return the filtered server list
+   */
   @Override
-  public List<ServiceCombServer> getFilteredListOfServers(List<ServiceCombServer> list,
-      Invocation invocation) {
+  public List<ServiceCombServer> getFilteredListOfServers(List<ServiceCombServer> list, Invocation invocation) {
+
+    // 0.check if rules exist
+    if (CollectionUtils.isEmpty(list)) {
+      return list;
+    }
+
     String targetServiceName = invocation.getMicroserviceName();
-    Map<String, String> headers = addHeaders(invocation);
-    headers = filterHeaders(headers);
-    return RouterFilter
-        .getFilteredListOfServers(list, targetServiceName, headers,
-            distributer);
+    if (StringUtils.isEmpty(targetServiceName)) {
+      return list;
+    }
+
+    // 1.init cache
+    if (!RouterRuleCache.getGrayScaleRuleForService(targetServiceName)) {
+      LOGGER.debug("route management init failed");
+      return list;
+    }
+
+    // 2.match rule
+    Map<String, String> headers = filterHeaders(addHeaders(invocation));
+    PolicyRuleItem invokeRule = RouterRuleMatcher.getInstance().match(targetServiceName, headers);
+
+    if (invokeRule == null) {
+      LOGGER.debug("route management match rule failed");
+      return list;
+    }
+
+    LOGGER.debug("route management match rule success: {}", invokeRule);
+
+    // 3.distribute selected endpoint
+    List<ServiceCombServer> resultList = distributor.distribute(targetServiceName, list, invokeRule);
+    LOGGER.debug("route management distribute rule success: {}", resultList);
+
+    return resultList;
   }
 
   private Map<String, String> filterHeaders(Map<String, String> headers) {
+    // users can add custom headerfilters
+    // 可移到其他包里，与灰度发布关联小
     List<RouterHeaderFilterExt> filters = SPIServiceUtils
         .getOrLoadSortedService(RouterHeaderFilterExt.class);
     for (RouterHeaderFilterExt filterExt : filters) {

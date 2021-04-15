@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.servicecomb.router.cache;
 
 import java.util.Arrays;
@@ -36,6 +37,7 @@ import com.netflix.config.DynamicStringProperty;
 /**
  * @Author GuoYl123
  * @Date 2019/10/17
+ * a tool class for reading rule and save to cache
  **/
 public class RouterRuleCache {
 
@@ -48,24 +50,23 @@ public class RouterRuleCache {
   private static Interner<String> servicePool = Interners.newWeakInterner();
 
   /**
-   * cache and register callback return false when: 1. parsing error 2. rule is null
-   *
-   * @param targetServiceName
-   * @return
+   * @param targetServiceName targetServiceName
+   * @return false when parsing error or rule not exist
    */
-  public static boolean doInit(String targetServiceName) {
+  public static boolean getGrayScaleRuleForService(String targetServiceName) {
     if (!isServerContainRule(targetServiceName)) {
       return false;
     }
+    // thread safe adding config
     if (!serviceInfoCacheMap.containsKey(targetServiceName)) {
       synchronized (servicePool.intern(targetServiceName)) {
         if (serviceInfoCacheMap.containsKey(targetServiceName)) {
           return true;
         }
-        //Yaml not thread-safe
         DynamicStringProperty ruleStr = DynamicPropertyFactory.getInstance().getStringProperty(
             String.format(ROUTE_RULE, targetServiceName), null, () -> {
-              refresh(targetServiceName);
+              // handler when config changed
+              refreshCache(targetServiceName);
               DynamicStringProperty tepRuleStr = DynamicPropertyFactory.getInstance()
                   .getStringProperty(String.format(ROUTE_RULE, targetServiceName), null);
               addAllRule(targetServiceName, tepRuleStr.get());
@@ -76,6 +77,11 @@ public class RouterRuleCache {
     return true;
   }
 
+  /**
+   * @param targetServiceName
+   * @param ruleStr
+   * @return false when add rule failed
+   */
   private static boolean addAllRule(String targetServiceName, String ruleStr) {
     if (StringUtils.isEmpty(ruleStr)) {
       return false;
@@ -85,7 +91,7 @@ public class RouterRuleCache {
       policyRuleItemList = Arrays
           .asList(YAMLUtil.parserObject(ruleStr, PolicyRuleItem[].class));
     } catch (Exception e) {
-      LOGGER.error("route management Serialization failed: {}", e.getMessage());
+      LOGGER.error("route management parsing failed: {}", e.getMessage());
       return false;
     }
     if (CollectionUtils.isEmpty(policyRuleItemList)) {
@@ -97,10 +103,9 @@ public class RouterRuleCache {
   }
 
   /**
-   * if a server don't have rule , avoid registered too many callback , it may cause memory leak
-   *
+   * check if a config does not contain rule for targetService, return
    * @param targetServiceName
-   * @return
+   * @return false to avoid adding too many config-change-callback
    */
   public static boolean isServerContainRule(String targetServiceName) {
     DynamicStringProperty lookFor = DynamicPropertyFactory.getInstance()
@@ -112,11 +117,11 @@ public class RouterRuleCache {
     return serviceInfoCacheMap;
   }
 
-  public static void refresh() {
+  public static void refreshCache() {
     serviceInfoCacheMap = new ConcurrentHashMap<>();
   }
 
-  public static void refresh(String targetServiceName) {
+  public static void refreshCache(String targetServiceName) {
     serviceInfoCacheMap.remove(targetServiceName);
   }
 }
