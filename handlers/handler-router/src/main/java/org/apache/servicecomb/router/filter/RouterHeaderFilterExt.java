@@ -14,21 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.custom;
 
-import org.apache.servicecomb.loadbalance.ServiceCombServer;
-import org.apache.servicecomb.router.distribute.AbstractRouterDistributor;
-import org.apache.servicecomb.registry.api.registry.Microservice;
+package org.apache.servicecomb.router.filter;
 
-public class ServiceCombCanaryDistributer extends
-    AbstractRouterDistributor<ServiceCombServer, Microservice> {
+import java.util.Map;
 
-    public ServiceCombCanaryDistributer() {
-        init(server -> MicroserviceCache.getInstance()
-                        .getService(server.getInstance().getServiceId()),
-                Microservice::getVersion,
-                Microservice::getServiceName,
-                Microservice::getProperties);
-    }
+/**
+ * @Author GuoYl123
+ * @Date 2019/10/17
+ * 用户定制header过滤器,可以移动到HttpServerFilter所在的包，与灰度发布关系不大
+ **/
+public interface RouterHeaderFilterExt {
 
+  default int getOrder() {
+    return 0;
+  }
+
+  default boolean enabled() {
+    return true;
+  }
+
+  Map<String, String> doFilter(Map<String, String> invokeHeader);
 }

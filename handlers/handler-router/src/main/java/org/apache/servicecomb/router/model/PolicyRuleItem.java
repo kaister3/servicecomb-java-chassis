@@ -17,6 +17,7 @@
 package org.apache.servicecomb.router.model;
 
 import java.util.List;
+
 import org.apache.servicecomb.router.exception.RouterIllegalParamException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,22 +28,20 @@ import org.springframework.util.CollectionUtils;
  * @Date 2019/10/17
  **/
 public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PolicyRuleItem.class);
 
   private Integer precedence;
 
-  private Matcher match;
+  private MatchItem matchItem;
 
   // any match
-  private List<RouteItem> route;
+  private List<RouteItem> routeItems;
 
   private Integer total;
 
   private boolean weightLess = false;
 
-  public PolicyRuleItem() {
-  }
+  public PolicyRuleItem() {}
 
   /**
    * if weight is less than 100, fill with minimum version
@@ -50,15 +49,15 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
    * @param latestVersionTag
    */
   public void check(TagItem latestVersionTag) {
-    if (CollectionUtils.isEmpty(route)) {
+    if (CollectionUtils.isEmpty(routeItems)) {
       throw new RouterIllegalParamException("canary rule list can not be null");
     }
-    if (route.size() == 1) {
-      route.get(0).setWeight(100);
+    if (routeItems.size() == 1) {
+      routeItems.get(0).setWeight(100);
       return;
     }
     int sum = 0;
-    for (RouteItem item : route) {
+    for (RouteItem item : routeItems) {
       if (item.getWeight() == null) {
         throw new RouterIllegalParamException("canary rule weight can not be null");
       }
@@ -71,7 +70,7 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
         LOGGER.warn("canary has some error when set default latestVersion");
       }
       weightLess = true;
-      route.add(new RouteItem(100 - sum, latestVersionTag));
+      routeItems.add(new RouteItem(100 - sum, latestVersionTag));
     }
   }
 
@@ -84,28 +83,12 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
     return param.precedence > this.precedence ? 1 : -1;
   }
 
-  public Integer getPrecedence() {
-    return precedence;
+  public MatchItem getMatchItem() {
+    return matchItem;
   }
 
-  public void setPrecedence(Integer precedence) {
-    this.precedence = precedence;
-  }
-
-  public Matcher getMatch() {
-    return match;
-  }
-
-  public void setMatch(Matcher match) {
-    this.match = match;
-  }
-
-  public List<RouteItem> getRoute() {
-    return route;
-  }
-
-  public void setRoute(List<RouteItem> route) {
-    this.route = route;
+  public List<RouteItem> getRouteItems() {
+    return routeItems;
   }
 
   public Integer getTotal() {
@@ -118,20 +101,5 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
 
   public boolean isWeightLess() {
     return weightLess;
-  }
-
-  public void setWeightLess(boolean weightLess) {
-    this.weightLess = weightLess;
-  }
-
-  @Override
-  public String toString() {
-    return "PolicyRuleItem{" +
-        "precedence=" + precedence +
-        ", match=" + match +
-        ", route=" + route +
-        ", total=" + total +
-        ", weightLess=" + weightLess +
-        '}';
   }
 }

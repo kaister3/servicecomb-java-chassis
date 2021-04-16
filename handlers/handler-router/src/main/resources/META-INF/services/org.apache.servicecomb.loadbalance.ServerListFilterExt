@@ -15,4 +15,4 @@
 # limitations under the License.
 #
 
-org.apache.servicecomb.router.custom.RouterServerListFilter
+org.apache.servicecomb.router.GrayScaleServerListFilter

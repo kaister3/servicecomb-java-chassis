@@ -14,7 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.custom;
+
+package org.apache.servicecomb.router.filter;
+
+import static org.apache.servicecomb.router.util.Constants.GRAY_SCALE_FLAG;
+import static org.apache.servicecomb.router.util.Constants.ROUTER_HEADER;
+import static org.apache.servicecomb.router.util.Constants.SERVICECOMB_ROUTER_HEADER;
+import static org.apache.servicecomb.router.util.Constants.TYPE_ROUTER;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,7 +33,6 @@ import org.apache.servicecomb.common.rest.filter.HttpServerFilter;
 import org.apache.servicecomb.core.Invocation;
 import org.apache.servicecomb.foundation.common.utils.JsonUtils;
 import org.apache.servicecomb.foundation.vertx.http.HttpServletRequestEx;
-import org.apache.servicecomb.router.cache.RouterRuleCache;
 import org.apache.servicecomb.swagger.invocation.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,38 +42,36 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.netflix.config.DynamicPropertyFactory;
 import com.netflix.config.DynamicStringProperty;
 
+/**
+ * some of the headers should be passed through
+ */
 public class RouterInvokeFilter implements HttpServerFilter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RouterInvokeFilter.class);
 
-  private static final String SERVICECOMB_ROUTER_HEADER = "servicecomb.router.header";
-
-  private static final String ROUTER_HEADER = "X-RouterContext";
-
   private static List<String> allHeader = new ArrayList<>();
-
 
   @Override
   public int getOrder() {
     return -90;
   }
 
+  /**
+   * if not enabled, don't register callback
+   */
   @Override
   public boolean enabled() {
-    return true;
+    return DynamicPropertyFactory.getInstance().getStringProperty(GRAY_SCALE_FLAG, "")
+        .get().equals(TYPE_ROUTER) && StringUtils.isNotEmpty(DynamicPropertyFactory.getInstance()
+            .getStringProperty(SERVICECOMB_ROUTER_HEADER, "").get());
   }
 
   /**
    * pass through headers
-   *
-   * @param invocation
-   * @param httpServletRequestEx
-   * @return
    */
   @Override
-  public Response afterReceiveRequest(Invocation invocation,
-      HttpServletRequestEx httpServletRequestEx) {
-    if (!isHaveHeadersRule()) {
+  public Response afterReceiveRequest(Invocation invocation, HttpServletRequestEx httpServletRequestEx) {
+    if (!enabled()) {
       return null;
     }
     if (loadHeaders()) {
@@ -83,30 +86,21 @@ public class RouterInvokeFilter implements HttpServerFilter {
   }
 
   /**
-   * read config and get Header
+   * if loading header names completed
    */
   private boolean loadHeaders() {
     if (!CollectionUtils.isEmpty(allHeader)) {
       return true;
     }
-    DynamicStringProperty headerStr = DynamicPropertyFactory.getInstance()
+    DynamicStringProperty headerNamesFromConfig = DynamicPropertyFactory.getInstance()
         .getStringProperty(SERVICECOMB_ROUTER_HEADER, null, () -> {
-          DynamicStringProperty temHeader = DynamicPropertyFactory.getInstance()
+          DynamicStringProperty tempHeader = DynamicPropertyFactory.getInstance()
               .getStringProperty(SERVICECOMB_ROUTER_HEADER, null);
-          if (!addAllHeaders(temHeader.get())) {
+          if (!addAllHeaders(tempHeader.get())) {
             allHeader = new ArrayList<>();
           }
         });
-    return addAllHeaders(headerStr.get());
-  }
-
-  /**
-   * if don't have headers rule , avoid registered too many callback
-   */
-  private boolean isHaveHeadersRule() {
-    DynamicStringProperty headerStr = DynamicPropertyFactory.getInstance()
-        .getStringProperty(SERVICECOMB_ROUTER_HEADER, null);
-    return StringUtils.isNotEmpty(headerStr.get());
+    return addAllHeaders(headerNamesFromConfig.get());
   }
 
   private boolean addAllHeaders(String str) {
@@ -126,7 +120,6 @@ public class RouterInvokeFilter implements HttpServerFilter {
 
   /**
    * get header from request
-   *
    * @param httpServletRequestEx
    * @return
    */

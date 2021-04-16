@@ -15,7 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.servicecomb.router.custom;
+package org.apache.servicecomb.router;
+
+import static org.apache.servicecomb.router.util.Constants.GRAY_SCALE_FLAG;
+import static org.apache.servicecomb.router.util.Constants.ROUTER_HEADER;
+import static org.apache.servicecomb.router.util.Constants.TYPE_ROUTER;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,9 +31,10 @@ import org.apache.servicecomb.foundation.common.utils.SPIServiceUtils;
 import org.apache.servicecomb.loadbalance.ServerListFilterExt;
 import org.apache.servicecomb.loadbalance.ServiceCombServer;
 import org.apache.servicecomb.router.cache.RouterRuleCache;
-import org.apache.servicecomb.router.distribute.RouterDistributor;
+import org.apache.servicecomb.router.distributor.ServiceCombCanaryDistributer;
+import org.apache.servicecomb.router.distributor.RouterDistributor;
 import org.apache.servicecomb.registry.api.registry.Microservice;
-import org.apache.servicecomb.router.match.RouterRuleMatcher;
+import org.apache.servicecomb.router.filter.RouterHeaderFilterExt;
 import org.apache.servicecomb.router.model.PolicyRuleItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +45,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.netflix.config.DynamicPropertyFactory;
 
-public class RouterServerListFilter implements ServerListFilterExt {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(RouterServerListFilter.class);
-
-  private static final String FLAG = "servicecomb.router.type";
-
-  private static final String TYPE_ROUTER = "router";
-
-  private static final String ROUTER_HEADER = "X-RouterContext";
+public class GrayScaleServerListFilter implements ServerListFilterExt {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrayScaleServerListFilter.class);
 
   RouterDistributor<ServiceCombServer, Microservice> distributor = new ServiceCombCanaryDistributer();
 
@@ -57,7 +55,7 @@ public class RouterServerListFilter implements ServerListFilterExt {
    */
   @Override
   public boolean enabled() {
-    return DynamicPropertyFactory.getInstance().getStringProperty(FLAG, "").get()
+    return DynamicPropertyFactory.getInstance().getStringProperty(GRAY_SCALE_FLAG, "").get()
         .equals(TYPE_ROUTER);
   }
 
@@ -69,11 +67,10 @@ public class RouterServerListFilter implements ServerListFilterExt {
   @Override
   public List<ServiceCombServer> getFilteredListOfServers(List<ServiceCombServer> list, Invocation invocation) {
 
-    // 0.check if rules exist
+    // 0.check if server list or targetServiceName is empty
     if (CollectionUtils.isEmpty(list)) {
       return list;
     }
-
     String targetServiceName = invocation.getMicroserviceName();
     if (StringUtils.isEmpty(targetServiceName)) {
       return list;
@@ -87,24 +84,22 @@ public class RouterServerListFilter implements ServerListFilterExt {
 
     // 2.match rule
     Map<String, String> headers = filterHeaders(addHeaders(invocation));
-    PolicyRuleItem invokeRule = RouterRuleMatcher.getInstance().match(targetServiceName, headers);
+    PolicyRuleItem invokeRule = RouterRuleCache.getInstance().matchHeader(targetServiceName, headers);
 
     if (invokeRule == null) {
-      LOGGER.debug("route management match rule failed");
+      LOGGER.info("this invocation does not match any grayscale rule");
       return list;
     }
-
-    LOGGER.debug("route management match rule success: {}", invokeRule);
+    LOGGER.info("route management match rule success: {}", invokeRule);
 
     // 3.distribute selected endpoint
     List<ServiceCombServer> resultList = distributor.distribute(targetServiceName, list, invokeRule);
-    LOGGER.debug("route management distribute rule success: {}", resultList);
-
+    LOGGER.info("route management distribute rule success: {}", resultList);
     return resultList;
   }
 
   private Map<String, String> filterHeaders(Map<String, String> headers) {
-    // users can add custom headerfilters
+    // users can add custom header filters
     // 可移到其他包里，与灰度发布关联小
     List<RouterHeaderFilterExt> filters = SPIServiceUtils
         .getOrLoadSortedService(RouterHeaderFilterExt.class);

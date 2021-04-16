@@ -14,22 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.distribute;
+package org.apache.servicecomb.router.distributor;
 
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
+import org.apache.servicecomb.loadbalance.ServiceCombServer;
+import org.apache.servicecomb.router.cache.MicroserviceCache;
+import org.apache.servicecomb.registry.api.registry.Microservice;
 
-/**
- * @Author GuoYl123
- * @Date 2019/10/17
- **/
-public interface RouterDistributor<T, E> {
+public class ServiceCombCanaryDistributer extends
+    AbstractRouterDistributor<ServiceCombServer, Microservice> {
 
-  void init(Function<T, E> getIns, Function<E, String> getVersion,
-      Function<E, String> getServerName,
-      Function<E, Map<String, String>> getProperties);
+    public ServiceCombCanaryDistributer() {
+        init(server -> MicroserviceCache.getInstance()
+                        .getService(server.getInstance().getServiceId()),
+                Microservice::getVersion,
+                Microservice::getServiceName,
+                Microservice::getProperties);
+    }
 
-  List<T> distribute(String targetServiceName, List<T> list, PolicyRuleItem invokeRule);
 }

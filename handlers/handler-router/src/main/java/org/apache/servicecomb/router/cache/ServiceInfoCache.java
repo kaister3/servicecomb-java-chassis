@@ -14,10 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.model;
+package org.apache.servicecomb.router.cache;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.apache.servicecomb.router.model.PolicyRuleItem;
+import org.apache.servicecomb.router.model.RouteItem;
+import org.apache.servicecomb.router.model.TagItem;
 
 /**
  * @Author GuoYl123
@@ -39,7 +43,7 @@ public class ServiceInfoCache {
     this.setAllrule(policyRuleItemList);
     // init tagitem
     this.getAllrule().forEach(rule ->
-        rule.getRoute().forEach(RouteItem::initTagItem)
+        rule.getRouteItems().forEach(RouteItem::initTagItem)
     );
     // sort by precedence
     this.sortRule();
@@ -50,7 +54,7 @@ public class ServiceInfoCache {
   }
 
   public TagItem getNextInvokeVersion(PolicyRuleItem policyRuleItem) {
-    List<RouteItem> rule = policyRuleItem.getRoute();
+    List<RouteItem> rule = policyRuleItem.getRouteItems();
     if (policyRuleItem.getTotal() == null) {
       policyRuleItem.setTotal(rule.stream().mapToInt(RouteItem::getWeight).sum());
     }

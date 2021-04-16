@@ -14,7 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.distribute;
+
+package org.apache.servicecomb.router.distributor;
 
 import com.netflix.loadbalancer.Server;
 import java.util.ArrayList;
@@ -112,7 +113,7 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements
         TagItem tagItem = new TagItem(getVersion.apply(ms), getProperties.apply(ms));
         TagItem targetTag = null;
         int maxMatch = 0;
-        for (RouteItem entry : invokeRule.getRoute()) {
+        for (RouteItem entry : invokeRule.getRouteItems()) {
           int nowMatch = entry.getTagitem().matchNum(tagItem);
           if (nowMatch > maxMatch) {
             maxMatch = nowMatch;
@@ -120,7 +121,7 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements
           }
         }
         if (invokeRule.isWeightLess() && getVersion.apply(ms).equals(latestV)) {
-          TagItem latestVTag = invokeRule.getRoute().get(invokeRule.getRoute().size() - 1)
+          TagItem latestVTag = invokeRule.getRouteItems().get(invokeRule.getRouteItems().size() - 1)
               .getTagitem();
           if (!versionServerMap.containsKey(latestVTag)) {
             versionServerMap.put(latestVTag, new ArrayList<>());

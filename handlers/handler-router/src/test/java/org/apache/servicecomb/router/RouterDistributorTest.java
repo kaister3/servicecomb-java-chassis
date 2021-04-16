@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.servicecomb.router.cache.RouterRuleCache;
-import org.apache.servicecomb.router.distribute.AbstractRouterDistributor;
-import org.apache.servicecomb.router.distribute.RouterDistributor;
+import org.apache.servicecomb.router.distributor.AbstractRouterDistributor;
+import org.apache.servicecomb.router.distributor.RouterDistributor;
 import org.junit.Assert;
 import org.junit.Test;
 

@@ -14,40 +14,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.servicecomb.router.match;
+package org.apache.servicecomb.router.model;
 
+import java.util.List;
 import java.util.Map;
-import org.apache.servicecomb.router.cache.RouterRuleCache;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
 
 /**
  * @Author GuoYl123
  * @Date 2019/10/17
  **/
-public class RouterRuleMatcher {
+public class MatchItem {
+  List<HeaderRuleItem> headerRuleItemList;
 
-  private static RouterRuleMatcher instance = new RouterRuleMatcher();
-
-  private RouterRuleMatcher() {
-  }
+  public MatchItem() {}
 
   /**
-   * only match header
-   *
-   * @param serviceName
-   * @return
+   * @param invokeHeaders invoke headers
+   * @return return true if this a header matches this matchItem, or return true if this match
+   *  item is empty, which means matching with any header
    */
-  public PolicyRuleItem match(String serviceName, Map<String, String> invokeHeader) {
-    for (PolicyRuleItem rule : RouterRuleCache.getServiceInfoCacheMap().get(serviceName)
-        .getAllrule()) {
-      if (rule.getMatch() == null || rule.getMatch().match(invokeHeader)) {
-        return rule;
+  public boolean match(Map<String, String> invokeHeaders) {
+    for (HeaderRuleItem headerRuleItem : headerRuleItemList) {
+      if (!headerRuleItem.match(
+          invokeHeaders.get(HeaderRuleItem.REGEX_PROPERTY),
+          invokeHeaders.get(HeaderRuleItem.EXACT_PROPERTY))) {
+        return false;
       }
     }
-    return null;
-  }
-
-  public static RouterRuleMatcher getInstance() {
-    return instance;
+    return true;
   }
 }

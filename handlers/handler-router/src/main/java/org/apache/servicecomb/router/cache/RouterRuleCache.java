@@ -19,12 +19,12 @@ package org.apache.servicecomb.router.cache;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.servicecomb.config.YAMLUtil;
 import org.apache.servicecomb.router.model.PolicyRuleItem;
-import org.apache.servicecomb.router.model.ServiceInfoCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -48,6 +48,8 @@ public class RouterRuleCache {
   private static final String ROUTE_RULE = "servicecomb.routeRule.%s";
 
   private static Interner<String> servicePool = Interners.newWeakInterner();
+
+  private static RouterRuleCache instance = new RouterRuleCache();
 
   /**
    * @param targetServiceName targetServiceName
@@ -123,5 +125,22 @@ public class RouterRuleCache {
 
   public static void refreshCache(String targetServiceName) {
     serviceInfoCacheMap.remove(targetServiceName);
+  }
+
+  public static RouterRuleCache getInstance() {
+    return instance;
+  }
+
+  /**
+   * @return the policyItem if t doesn't have a matchItem or its matchItem
+   *  matches with the invokeHeader
+   */
+  public PolicyRuleItem matchHeader(String targetServiceName, Map<String, String> invokeHeader) {
+    for (PolicyRuleItem policyRuleItem : serviceInfoCacheMap.get(targetServiceName).getAllrule()) {
+      if (policyRuleItem.getMatchItem() == null || policyRuleItem.getMatchItem().match(invokeHeader)) {
+        return policyRuleItem;
+      }
+    }
+    return null;
   }
 }
