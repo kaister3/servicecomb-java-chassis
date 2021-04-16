@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.servicecomb.router.cache.RouterRuleCache;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
+import org.apache.servicecomb.router.model.RouteRuleItem;
+import org.apache.servicecomb.router.model.PrecedenceRuleItem;
 import org.apache.servicecomb.router.model.RouteItem;
 import org.apache.servicecomb.router.model.TagItem;
 import org.apache.servicecomb.router.util.VersionCompareUtil;
@@ -37,9 +37,7 @@ import org.springframework.util.CollectionUtils;
  * @Author GuoYl123
  * @Date 2019/10/17
  **/
-public abstract class AbstractRouterDistributor<T extends Server, E> implements
-    RouterDistributor<T, E> {
-
+public abstract class AbstractRouterDistributor<T extends Server, E> implements RouterDistributor<T, E> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractRouterDistributor.class);
 
   private Function<T, E> getIns;
@@ -51,28 +49,31 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements
   private Function<E, Map<String, String>> getProperties;
 
   @Override
-  public List<T> distribute(String targetServiceName, List<T> list, PolicyRuleItem invokeRule) {
+  public List<T> distribute(String targetServiceName, List<T> list, PrecedenceRuleItem invokeRule) {
     //init LatestVersion
     initLatestVersion(targetServiceName, list);
 
     invokeRule.check(
-        RouterRuleCache.getServiceInfoCacheMap().get(targetServiceName).getLatestVersionTag());
+        RouteRuleItem.getServiceRuleItemMap().get(targetServiceName).getLatestVersionTag());
 
     // get tag list
-    Map<TagItem, List<T>> versionServerMap = getDistributList(targetServiceName, list, invokeRule);
+    Map<TagItem, List<T>> versionServerMap = getDistributeList(targetServiceName, list, invokeRule);
 
     if (CollectionUtils.isEmpty(versionServerMap)) {
       LOGGER.debug("route management can not match any rule and route the latest version");
       return getLatestVersionList(list, targetServiceName);
     }
 
-    TagItem targetTag = getFiltedServerTagItem(invokeRule, targetServiceName);
+    TagItem targetTag = getFilteredServerTagItem(invokeRule, targetServiceName);
     if (versionServerMap.containsKey(targetTag)) {
       return versionServerMap.get(targetTag);
     }
     return getLatestVersionList(list, targetServiceName);
   }
 
+  /**
+   * init methods
+   */
   @Override
   public void init(Function<T, E> getIns,
       Function<E, String> getVersion,
@@ -84,25 +85,19 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements
     this.getProperties = getProperties;
   }
 
-  public TagItem getFiltedServerTagItem(PolicyRuleItem rule, String targetServiceName) {
-    return RouterRuleCache.getServiceInfoCacheMap().get(targetServiceName)
-        .getNextInvokeVersion(rule);
+  public TagItem getFilteredServerTagItem(PrecedenceRuleItem rule, String targetServiceName) {
+    return RouteRuleItem.getServiceRuleItemMap().get(targetServiceName).getLatestVersionTag();
   }
 
   /**
    * 1.filter targetService
-   * 2.establish map is a more complicate way than direct traversal， because of multiple matches.
-   *
+   * 2.establish map in a more complicate way than direct traversal, because of multiple matches.
    * the method getProperties() contains other field that we don't need.
-   *
-   * @param serviceName
-   * @param list
-   * @return
    */
-  private Map<TagItem, List<T>> getDistributList(String serviceName,
+  private Map<TagItem, List<T>> getDistributeList(String serviceName,
       List<T> list,
-      PolicyRuleItem invokeRule) {
-    String latestV = RouterRuleCache.getServiceInfoCacheMap().get(serviceName).getLatestVersionTag()
+      PrecedenceRuleItem invokeRule) {
+    String latestV = RouteRuleItem.getServiceRuleItemMap().get(serviceName).getLatestVersionTag()
         .getVersion();
     Map<TagItem, List<T>> versionServerMap = new HashMap<>();
     for (T server : list) {
@@ -140,34 +135,32 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements
   }
 
 
+  /**
+   * init the latest version
+   */
   public void initLatestVersion(String serviceName, List<T> list) {
-    if (RouterRuleCache.getServiceInfoCacheMap().get(serviceName).getLatestVersionTag() != null) {
+    if (RouteRuleItem.getServiceRuleItemMap().get(serviceName).getLatestVersionTag() != null) {
       return;
     }
     String latestVersion = null;
     for (T server : list) {
-      E ms = getIns.apply(server);
-      if (getServerName.apply(ms).equals(serviceName)) {
+      E microservice = getIns.apply(server);
+      if (getServerName.apply(microservice).equals(serviceName)) {
         if (latestVersion == null || VersionCompareUtil
-            .compareVersion(latestVersion, getVersion.apply(ms)) == -1) {
-          latestVersion = getVersion.apply(ms);
+            .compareVersion(latestVersion, getVersion.apply(microservice)) == -1) {
+          latestVersion = getVersion.apply(microservice);
         }
       }
     }
     TagItem tagitem = new TagItem(latestVersion);
-    RouterRuleCache.getServiceInfoCacheMap().get(serviceName).setLatestVersionTag(tagitem);
+    RouteRuleItem.getServiceRuleItemMap().get(serviceName).setLatestVersionTag(tagitem);
   }
 
-  /**
-   * @param list
-   * @param targetServiceName
-   * @return
-   */
   public List<T> getLatestVersionList(List<T> list, String targetServiceName) {
-    String latestV = RouterRuleCache.getServiceInfoCacheMap().get(targetServiceName)
+    String latestVersion = RouteRuleItem.getServiceRuleItemMap().get(targetServiceName)
         .getLatestVersionTag().getVersion();
     return list.stream().filter(server ->
-        getVersion.apply(getIns.apply(server)).equals(latestV)
+        getVersion.apply(getIns.apply(server)).equals(latestVersion)
     ).collect(Collectors.toList());
   }
 }

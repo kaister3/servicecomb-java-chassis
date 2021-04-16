@@ -27,8 +27,8 @@ import org.springframework.util.CollectionUtils;
  * @Author GuoYl123
  * @Date 2019/10/17
  **/
-public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PolicyRuleItem.class);
+public class PrecedenceRuleItem implements Comparable<PrecedenceRuleItem> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PrecedenceRuleItem.class);
 
   private Integer precedence;
 
@@ -37,15 +37,14 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
   // any match
   private List<RouteItem> routeItems;
 
-  private Integer total;
+  private Integer totalWeight;
 
   private boolean weightLess = false;
 
-  public PolicyRuleItem() {}
+  public PrecedenceRuleItem() {}
 
   /**
    * if weight is less than 100, fill with minimum version
-   *
    * @param latestVersionTag
    */
   public void check(TagItem latestVersionTag) {
@@ -75,7 +74,7 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
   }
 
   @Override
-  public int compareTo(PolicyRuleItem param) {
+  public int compareTo(PrecedenceRuleItem param) {
     if (param.precedence.equals(this.precedence)) {
       LOGGER.warn("the same canary precedence is not recommended");
       return 0;
@@ -91,12 +90,12 @@ public class PolicyRuleItem implements Comparable<PolicyRuleItem> {
     return routeItems;
   }
 
-  public Integer getTotal() {
-    return total;
+  public Integer getTotalWeight() {
+    return totalWeight;
   }
 
-  public void setTotal(Integer total) {
-    this.total = total;
+  public void setTotalWeight(Integer totalWeight) {
+    this.totalWeight = totalWeight;
   }
 
   public boolean isWeightLess() {

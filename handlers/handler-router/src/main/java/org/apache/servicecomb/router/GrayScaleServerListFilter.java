@@ -30,12 +30,12 @@ import org.apache.servicecomb.foundation.common.utils.JsonUtils;
 import org.apache.servicecomb.foundation.common.utils.SPIServiceUtils;
 import org.apache.servicecomb.loadbalance.ServerListFilterExt;
 import org.apache.servicecomb.loadbalance.ServiceCombServer;
-import org.apache.servicecomb.router.cache.RouterRuleCache;
+import org.apache.servicecomb.router.model.RouteRuleItem;
 import org.apache.servicecomb.router.distributor.ServiceCombCanaryDistributer;
 import org.apache.servicecomb.router.distributor.RouterDistributor;
 import org.apache.servicecomb.registry.api.registry.Microservice;
 import org.apache.servicecomb.router.filter.RouterHeaderFilterExt;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
+import org.apache.servicecomb.router.model.PrecedenceRuleItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -77,14 +77,14 @@ public class GrayScaleServerListFilter implements ServerListFilterExt {
     }
 
     // 1.init cache
-    if (!RouterRuleCache.getGrayScaleRuleForService(targetServiceName)) {
+    if (!RouteRuleItem.getGrayScaleRuleForService(targetServiceName)) {
       LOGGER.debug("route management init failed");
       return list;
     }
 
     // 2.match rule
     Map<String, String> headers = filterHeaders(addHeaders(invocation));
-    PolicyRuleItem invokeRule = RouterRuleCache.getInstance().matchHeader(targetServiceName, headers);
+    PrecedenceRuleItem invokeRule = RouteRuleItem.getInstance().matchHeader(targetServiceName, headers);
 
     if (invokeRule == null) {
       LOGGER.info("this invocation does not match any grayscale rule");

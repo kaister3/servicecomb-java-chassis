@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.servicecomb.router.cache;
+package org.apache.servicecomb.router.model;
 
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.servicecomb.config.YAMLUtil;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -39,17 +38,17 @@ import com.netflix.config.DynamicStringProperty;
  * @Date 2019/10/17
  * a tool class for reading rule and save to cache
  **/
-public class RouterRuleCache {
+public class RouteRuleItem {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(RouterRuleCache.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RouteRuleItem.class);
 
-  private static ConcurrentHashMap<String, ServiceInfoCache> serviceInfoCacheMap = new ConcurrentHashMap<>();
+  private static ConcurrentHashMap<String, ServiceRuleItem> serviceRuleItemMap = new ConcurrentHashMap<>();
 
   private static final String ROUTE_RULE = "servicecomb.routeRule.%s";
 
   private static Interner<String> servicePool = Interners.newWeakInterner();
 
-  private static RouterRuleCache instance = new RouterRuleCache();
+  private static RouteRuleItem instance = new RouteRuleItem();
 
   /**
    * @param targetServiceName targetServiceName
@@ -60,9 +59,9 @@ public class RouterRuleCache {
       return false;
     }
     // thread safe adding config
-    if (!serviceInfoCacheMap.containsKey(targetServiceName)) {
+    if (!serviceRuleItemMap.containsKey(targetServiceName)) {
       synchronized (servicePool.intern(targetServiceName)) {
-        if (serviceInfoCacheMap.containsKey(targetServiceName)) {
+        if (serviceRuleItemMap.containsKey(targetServiceName)) {
           return true;
         }
         DynamicStringProperty ruleStr = DynamicPropertyFactory.getInstance().getStringProperty(
@@ -88,10 +87,10 @@ public class RouterRuleCache {
     if (StringUtils.isEmpty(ruleStr)) {
       return false;
     }
-    List<PolicyRuleItem> policyRuleItemList;
+    List<PrecedenceRuleItem> policyRuleItemList;
     try {
       policyRuleItemList = Arrays
-          .asList(YAMLUtil.parserObject(ruleStr, PolicyRuleItem[].class));
+          .asList(YAMLUtil.parserObject(ruleStr, PrecedenceRuleItem[].class));
     } catch (Exception e) {
       LOGGER.error("route management parsing failed: {}", e.getMessage());
       return false;
@@ -99,8 +98,8 @@ public class RouterRuleCache {
     if (CollectionUtils.isEmpty(policyRuleItemList)) {
       return false;
     }
-    ServiceInfoCache serviceInfoCache = new ServiceInfoCache(policyRuleItemList);
-    serviceInfoCacheMap.put(targetServiceName, serviceInfoCache);
+    ServiceRuleItem serviceInfoCache = new ServiceRuleItem(policyRuleItemList);
+    serviceRuleItemMap.put(targetServiceName, serviceInfoCache);
     return true;
   }
 
@@ -115,30 +114,30 @@ public class RouterRuleCache {
     return !StringUtils.isEmpty(lookFor.get());
   }
 
-  public static ConcurrentHashMap<String, ServiceInfoCache> getServiceInfoCacheMap() {
-    return serviceInfoCacheMap;
+  public static ConcurrentHashMap<String, ServiceRuleItem> getServiceRuleItemMap() {
+    return serviceRuleItemMap;
   }
 
   public static void refreshCache() {
-    serviceInfoCacheMap = new ConcurrentHashMap<>();
+    serviceRuleItemMap = new ConcurrentHashMap<>();
   }
 
   public static void refreshCache(String targetServiceName) {
-    serviceInfoCacheMap.remove(targetServiceName);
+    serviceRuleItemMap.remove(targetServiceName);
   }
 
-  public static RouterRuleCache getInstance() {
+  public static RouteRuleItem getInstance() {
     return instance;
   }
 
   /**
-   * @return the policyItem if t doesn't have a matchItem or its matchItem
+   * @return the policyItem if it doesn't have a matchItem or its matchItem
    *  matches with the invokeHeader
    */
-  public PolicyRuleItem matchHeader(String targetServiceName, Map<String, String> invokeHeader) {
-    for (PolicyRuleItem policyRuleItem : serviceInfoCacheMap.get(targetServiceName).getAllrule()) {
-      if (policyRuleItem.getMatchItem() == null || policyRuleItem.getMatchItem().match(invokeHeader)) {
-        return policyRuleItem;
+  public PrecedenceRuleItem matchHeader(String targetServiceName, Map<String, String> invokeHeader) {
+    for (PrecedenceRuleItem precedenceRuleItem : serviceRuleItemMap.get(targetServiceName).getPrecedenceRuleItems()) {
+      if (precedenceRuleItem.getMatchItem() == null || precedenceRuleItem.getMatchItem().match(invokeHeader)) {
+        return precedenceRuleItem;
       }
     }
     return null;

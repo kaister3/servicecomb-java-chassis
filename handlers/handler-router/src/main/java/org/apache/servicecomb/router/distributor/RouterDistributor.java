@@ -19,7 +19,7 @@ package org.apache.servicecomb.router.distributor;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import org.apache.servicecomb.router.model.PolicyRuleItem;
+import org.apache.servicecomb.router.model.PrecedenceRuleItem;
 
 /**
  * @Author GuoYl123
@@ -31,5 +31,5 @@ public interface RouterDistributor<T, E> {
       Function<E, String> getServerName,
       Function<E, Map<String, String>> getProperties);
 
-  List<T> distribute(String targetServiceName, List<T> list, PolicyRuleItem invokeRule);
+  List<T> distribute(String targetServiceName, List<T> list, PrecedenceRuleItem invokeRule);
 }

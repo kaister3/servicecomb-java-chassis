@@ -24,32 +24,25 @@ import java.util.Map;
  **/
 public class RouteItem implements Comparable<RouteItem> {
 
-  private Integer weight;
+  private int weight;
   /**
-   * for load balance
+   * for load-balance
    */
-  private Integer currentWeight = 0;
+  private int currentWeight = 0;
 
-  private Map<String, String> tags;
+  private Map<String, String> allTags;
 
   private TagItem tagitem;
 
 
   public void initTagItem() {
-    if (tags != null && tags.containsKey("version")) {
-      tagitem = new TagItem(tags);
+    if (allTags != null && allTags.containsKey("version")) {
+      tagitem = new TagItem(allTags);
     }
-  }
-
-  public void addCurrentWeight() {
-    currentWeight += weight;
   }
 
   public void reduceCurrentWeight(int total) {
     currentWeight -= total;
-  }
-
-  public RouteItem() {
   }
 
   public RouteItem(Integer weight, TagItem tags) {
@@ -69,24 +62,8 @@ public class RouteItem implements Comparable<RouteItem> {
     return currentWeight;
   }
 
-  public void setCurrentWeight(Integer currentWeight) {
-    this.currentWeight = currentWeight;
-  }
-
-  public Map<String, String> getTags() {
-    return tags;
-  }
-
-  public void setTags(Map<String, String> tags) {
-    this.tags = tags;
-  }
-
   public TagItem getTagitem() {
     return tagitem;
-  }
-
-  public void setTagitem(TagItem tagitem) {
-    this.tagitem = tagitem;
   }
 
   @Override
@@ -95,15 +72,5 @@ public class RouteItem implements Comparable<RouteItem> {
       return 0;
     }
     return param.weight > this.weight ? 1 : -1;
-  }
-
-  @Override
-  public String toString() {
-    return "RouteItem{" +
-        "weight=" + weight +
-        ", currentWeight=" + currentWeight +
-        ", tags=" + tags +
-        ", tagitem=" + tagitem +
-        '}';
   }
 }

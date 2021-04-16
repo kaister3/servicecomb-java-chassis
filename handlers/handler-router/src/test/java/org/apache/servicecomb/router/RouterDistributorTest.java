@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.servicecomb.router.cache.RouterRuleCache;
+import org.apache.servicecomb.router.model.RouteRuleItem;
 import org.apache.servicecomb.router.distributor.AbstractRouterDistributor;
 import org.apache.servicecomb.router.distributor.RouterDistributor;
 import org.junit.Assert;
@@ -123,7 +123,7 @@ public class RouterDistributorTest {
         result = rule;
       }
     };
-    RouterRuleCache.refreshCache();
+    RouteRuleItem.refreshCache();
     /*return RouterFilter
         .getFilteredListOfServers(serverlist, TARGET_SERVICE_NAME, headermap,
             testDistributer);*/
