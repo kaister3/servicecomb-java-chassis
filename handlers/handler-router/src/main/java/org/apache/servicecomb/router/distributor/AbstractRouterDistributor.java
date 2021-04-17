@@ -85,6 +85,9 @@ public abstract class AbstractRouterDistributor<T extends Server, E> implements 
     this.getProperties = getProperties;
   }
 
+  /**
+   * ???
+   */
   public TagItem getFilteredServerTagItem(PrecedenceRuleItem rule, String targetServiceName) {
     return RouteRuleItem.getServiceRuleItemMap().get(targetServiceName).getLatestVersionTag();
   }
