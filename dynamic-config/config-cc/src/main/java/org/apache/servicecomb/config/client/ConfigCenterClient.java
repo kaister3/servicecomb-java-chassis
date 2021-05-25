@@ -141,7 +141,7 @@ public class ConfigCenterClient {
       IpPort ipPort = NetUtils.parseIpPortFromURI(configCenter);
       HttpClients.getClient(ConfigCenterHttpClientOptionsSPI.CLIENT_NAME).runOnContext(client -> {
 
-        Future<Buffer> body = client.request(HttpMethod.GET, ipPort.getPort(), ipPort.getHostOrIp(), uriConst.MEMBERS)
+        client.request(HttpMethod.GET, ipPort.getPort(), ipPort.getHostOrIp(), uriConst.MEMBERS)
             .compose(request -> {
               SignRequest signReq = createSignRequest(request.getMethod().toString(),
                   configCenter + uriConst.MEMBERS,
@@ -158,17 +158,17 @@ public class ConfigCenterClient {
               });
               return request.send().compose(response -> {
                 if (response.statusCode() == HttpResponseStatus.OK.code()) {
-                  return response.body();
+                  return response.body().compose(buffer -> {
+                    memberDiscovery.refreshMembers(buffer.toJsonObject());
+                    return Future.succeededFuture();
+                  });
                 }
-
-                return Future.failedFuture("unexpected error code=" + response.statusCode());
+                LOGGER.error("unexpected error code=" + response.statusCode());
+                return Future.succeededFuture();
               });
-            });
-        if (body.failed()) {
-          LOGGER.error(body.result().toString());
-          return;
-        }
-        memberDiscovery.refreshMembers(body.result().toJsonObject());
+            }).onFailure(failure -> {
+          LOGGER.error("Fetch member from {} failed. Error message is [{}].", configCenter, failure.getMessage());
+        });
       });
     }
   }
@@ -330,7 +330,8 @@ public class ConfigCenterClient {
           + ParseConfigUtils.getInstance().getCurrentVersionInfo();
       HttpClients.getClient(ConfigCenterHttpClientOptionsSPI.CLIENT_NAME).runOnContext(client -> {
         IpPort ipPort = NetUtils.parseIpPortFromURI(configcenter);
-        Future<Buffer> buffer = client.request(HttpMethod.GET, ipPort.getPort(), ipPort.getHostOrIp(), path)
+
+        client.request(HttpMethod.GET, ipPort.getPort(), ipPort.getHostOrIp(), path)
             .compose(request -> {
               Map<String, String> headers = new HashMap<>();
               headers.put("x-domain-name", tenantName);
@@ -357,39 +358,35 @@ public class ConfigCenterClient {
 
               return request.send().compose(rsp -> {
                 if (rsp.statusCode() == HttpResponseStatus.OK.code()) {
-                  return rsp.body();
+                  return rsp.body().compose(buffer -> {
+                    try {
+                      parseConfigUtils.refreshConfigItems(JsonUtils.OBJ_MAPPER.readValue(buffer.toString(),
+                          new TypeReference<LinkedHashMap<String, Map<String, Object>>>() {
+                          }));
+                      EventManager.post(new ConnSuccEvent());
+                    } catch (IOException e) {
+                      return Future.failedFuture(e);
+                    }
+                    return Future.succeededFuture();
+                  });
                 } else if (rsp.statusCode() == HttpResponseStatus.NOT_MODIFIED.code()) {
-                  //nothing changed
                   EventManager.post(new ConnSuccEvent());
-                  if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Updating remote config is done. the revision {} has no change",
-                        ParseConfigUtils.getInstance().getCurrentVersionInfo());
-                  }
                   latch.countDown();
-                  return Future.failedFuture((String) null);
+                  return Future.succeededFuture();
                 } else {
-
-                  LOGGER.error("Server error message is [{}].", rsp.body().toString());
-                  latch.countDown();
-
-                  EventManager.post(new ConnFailEvent("fetch config fail"));
-                  LOGGER.error("Config update from {} failed.", configcenter);
-                  return Future.failedFuture((String) null);
+                  return rsp.body().compose(buffer -> {
+                    LOGGER.error("Config update from {} failed.", configcenter);
+                    LOGGER.error("Server error message is [{}].", buffer.toString());
+                    latch.countDown();
+                    EventManager.post(new ConnFailEvent("fetch config fail"));
+                    return Future.succeededFuture();
+                  });
                 }
               });
-            });
-        if (buffer.failed()) {
-          LOGGER.error("Server error message is [{}].", buffer.result().toString());
+            }).onFailure(failure -> {
+          LOGGER.error("Config update from {} failed.", failure);
           return;
-        }
-        try {
-          parseConfigUtils.refreshConfigItems(JsonUtils.OBJ_MAPPER.readValue(buffer.result().toString(),
-              new TypeReference<LinkedHashMap<String, Map<String, Object>>>() {
-              }));
-          EventManager.post(new ConnSuccEvent());
-        } catch (IOException e) {
-          LOGGER.error("parse config data error: {}", e.getMessage());
-        }
+        });
       });
       if (wait) {
         try {

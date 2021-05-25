@@ -134,13 +134,7 @@ public class KieClient {
             .request(HttpMethod.GET, ipPort.getPort(), ipPort.getHostOrIp(), finalPath)
             .compose(request -> {
               request.setTimeout(timeout);
-              request.exceptionHandler(e -> {
-                EventManager.post(new ConnFailEvent("fetch config fail"));
-                LOGGER.error("Config update from {} failed. Error message is [{}].",
-                    serviceUri,
-                    e.getMessage());
-                latch.countDown();
-              });
+
               return request.send().compose(response -> {
                 if (response.statusCode() == HttpStatus.SC_OK) {
                   revision = response.getHeader("X-Kie-Revision");
@@ -172,7 +166,13 @@ public class KieClient {
                 }
                 return Future.succeededFuture();
               });
-            });
+            }).onFailure(failure -> {
+          EventManager.post(new ConnFailEvent("fetch config fail"));
+          LOGGER.error("Config update from {} failed. Error message is [{}].",
+              serviceUri,
+              failure.getMessage());
+          latch.countDown();
+        });
       });
     }
   }

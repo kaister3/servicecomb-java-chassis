@@ -98,14 +98,6 @@ public class DefaultMonitorDataPublisher implements MonitorDataPublisher {
           host.getHostOrIp(),
           url).compose(request -> {
         request.setTimeout(MonitorConstant.getInterval() / MonitorConstant.MAX_RETRY_TIMES);
-        request.exceptionHandler(e -> {
-          EventManager.post(new MonitorFailEvent("send monitor data fail."));
-          LOGGER.warn("Send monitor data to {} failed , {}", endponit, e.getMessage());
-          if (e instanceof UnknownHostException) {
-            LOGGER.error("DNS resolve failed!", e);
-          }
-          addressManager.updateStates(endponit, true);
-        });
 
         try {
           SignRequest signReq = SignUtil.createSignRequest(request.getMethod().toString(),
@@ -121,26 +113,33 @@ public class DefaultMonitorDataPublisher implements MonitorDataPublisher {
         request.headers().add("environment", RegistryUtils.getMicroservice().getEnvironment());
 
         return request.send().compose(rsp -> {
-          rsp.exceptionHandler(e -> LOGGER.warn("publish error ", e));
           if (rsp.statusCode() != HttpResponseStatus.OK.code()) {
             if (times < MonitorConstant.MAX_RETRY_TIMES
                 && rsp.statusCode() == HttpResponseStatus.BAD_GATEWAY.code()) {
               doSend(endponit, jsonData, url, host, times + 1);
               return Future.succeededFuture();
             }
-            rsp.bodyHandler(buffer -> {
+            return rsp.body().compose(buffer -> {
+              EventManager.post(new MonitorFailEvent("send monitor data fail."));
+              addressManager.updateStates(endponit, false);
               LOGGER.warn("Send data to url {} failed and status line is {}",
                   url,
                   rsp.statusCode());
               LOGGER.warn("message: {}", buffer);
+              return Future.succeededFuture();
             });
-            EventManager.post(new MonitorFailEvent("send monitor data fail."));
-            addressManager.updateStates(endponit, false);
           } else {
             EventManager.post(new MonitorSuccEvent());
             addressManager.updateStates(endponit, false);
           }
           return Future.succeededFuture();
+        }).onFailure(failure -> {
+          EventManager.post(new MonitorFailEvent("send monitor data fail."));
+          LOGGER.warn("Send monitor data to {} failed , {}", endponit, failure.getMessage());
+          if (failure instanceof UnknownHostException) {
+            LOGGER.error("DNS resolve failed!", failure);
+          }
+          addressManager.updateStates(endponit, true);
         });
       });
     });
