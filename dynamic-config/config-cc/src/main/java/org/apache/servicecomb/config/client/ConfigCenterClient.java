@@ -152,10 +152,7 @@ public class ConfigCenterClient {
               }
               request.headers()
                   .addAll(AuthHeaderLoader.getInstance().loadAuthHeaders(signReq));
-              request.exceptionHandler(e -> {
-                LOGGER.error("Fetch member from {} failed. Error message is [{}].", configCenter, e.getMessage());
-                logIfDnsFailed(e);
-              });
+
               return request.send().compose(response -> {
                 if (response.statusCode() == HttpResponseStatus.OK.code()) {
                   return response.body().compose(buffer -> {
@@ -168,6 +165,7 @@ public class ConfigCenterClient {
               });
             }).onFailure(failure -> {
           LOGGER.error("Fetch member from {} failed. Error message is [{}].", configCenter, failure.getMessage());
+          logIfDnsFailed(failure);
         });
       });
     }
@@ -347,14 +345,6 @@ public class ConfigCenterClient {
                           headers,
                           null)));
               request.setTimeout((BOOTUP_WAIT_TIME - 1) * 1000);
-              request.exceptionHandler(e -> {
-                EventManager.post(new ConnFailEvent("fetch config fail"));
-                LOGGER.error("Config update from {} failed. Error message is [{}].",
-                    configcenter,
-                    e.getMessage());
-                logIfDnsFailed(e);
-                latch.countDown();
-              });
 
               return request.send().compose(rsp -> {
                 if (rsp.statusCode() == HttpResponseStatus.OK.code()) {
@@ -384,8 +374,12 @@ public class ConfigCenterClient {
                 }
               });
             }).onFailure(failure -> {
-          LOGGER.error("Config update from {} failed.", failure);
-          return;
+          EventManager.post(new ConnFailEvent("fetch config fail"));
+          LOGGER.error("Config update from {} failed. Error message is [{}].",
+              configcenter,
+              failure.getMessage());
+          logIfDnsFailed(failure);
+          latch.countDown();
         });
       });
       if (wait) {
