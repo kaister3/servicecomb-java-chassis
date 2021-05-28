@@ -235,6 +235,9 @@ public class RefreshableMicroserviceCache implements MicroserviceCache {
 
   void onSafeModeChanged(SafeModeChangeEvent modeChangeEvent) {
     this.safeMode = modeChangeEvent.getCurrentMode();
+    if (!safeMode) {
+      this.refresh();
+    }
   }
 
   private boolean microserviceMatched(MicroserviceInstanceChangedEvent event) {
